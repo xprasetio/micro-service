@@ -12,4 +12,5 @@ type UserEntity struct {
 	Lng        string `json:"lng"`
 	IsVerified bool   `json:"is_verified"`
 	RoleName   string `json:"role_name"`
+	Token      string `json:"token"`
 }

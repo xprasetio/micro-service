@@ -21,9 +21,17 @@ type PsqlDB struct {
 	DBMaxIdle int    `mapstructure:"PSQL_DB_MAX_IDLE" json:"psql_db_max_idle" yaml:"PSQL_DB_MAX_IDLE"`
 }
 
+type RabbitMQ struct {
+	Host     string `mapstructure:"RABBITMQ_HOST" json:"rabbitmq_host" yaml:"RABBITMQ_HOST"`
+	Port     string `mapstructure:"RABBITMQ_PORT" json:"rabbitmq_port" yaml:"RABBITMQ_PORT"`
+	User     string `mapstructure:"RABBITMQ_USER" json:"rabbitmq_user" yaml:"RABBITMQ_USER"`
+	Password string `mapstructure:"RABBITMQ_PASSWORD" json:"rabbitmq_password" yaml:"RABBITMQ_PASSWORD"`
+}
 type Config struct {
 	App  App    `mapstructure:"app" json:"app" yaml:"app"`
 	Psql PsqlDB `mapstructure:"psql" json:"psql" yaml:"psql"`
+
+	RabbitMQ RabbitMQ `mapstructure:"rabbitmq" json:"rabbitmq" yaml:"rabbitmq"`
 }
 
 func NewConfig() *Config {
@@ -43,6 +51,13 @@ func NewConfig() *Config {
 			SSLMode:   viper.GetString("DATABASE_SSL_MODE"),
 			DBMaxOpen: viper.GetInt("DATABASE_MAX_OPEN_CONNECTIONS"),
 			DBMaxIdle: viper.GetInt("DATABASE_MAX_IDLE_CONNECTIONS"),
+		},
+
+		RabbitMQ: RabbitMQ{
+			Host:     viper.GetString("RABBITMQ_HOST"),
+			Port:     viper.GetString("RABBITMQ_PORT"),
+			User:     viper.GetString("RABBITMQ_USER"),
+			Password: viper.GetString("RABBITMQ_PASSWORD"),
 		},
 	}
 }
