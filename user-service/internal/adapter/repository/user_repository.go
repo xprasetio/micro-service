@@ -22,10 +22,18 @@ type userRepository struct {
 
 // CreateUserAccount implements [UserRepositoryInterface].
 func (u *userRepository) CreateUserAccount(ctx context.Context, req entity.UserEntity) error {
+	modelRole := model.Role{}
+	err := u.db.WithContext(ctx).Where("name = ?", "Customer").First(&modelRole).Error
+	if err != nil {
+		log.Errorf("[UserRepository-1] CreateUserAccount: %v", err)
+		return err
+	}
+
 	modelUser := model.User{
 		Name:     req.Name,
 		Email:    req.Email,
 		Password: req.Password,
+		Roles:    []model.Role{modelRole},
 	}
 	if err := u.db.WithContext(ctx).Create(&modelUser).Error; err != nil {
 		log.Errorf("[UserRepository-1] CreateUserAccount: %v", err)

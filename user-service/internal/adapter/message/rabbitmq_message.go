@@ -61,12 +61,12 @@ func PublishMessage(email, message, notif_type string) error {
 	}
 
 	err = ch.Publish(
-		"amq.direct", // exchange
-		queue.Name,   // routing key
-		false,        // mandatory
-		false,        // immediate
+		"",         // exchange
+		queue.Name, // routing key
+		false,      // mandatory
+		false,      // immediate
 		amqp.Publishing{
-			ContentType: "text/plain",
+			ContentType: "application/json",
 			Body:        body,
 		})
 	if err != nil {
