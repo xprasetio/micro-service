@@ -14,6 +14,8 @@ import (
 type UserRepositoryInterface interface {
 	GetUserByEmail(ctx context.Context, email string) (*entity.UserEntity, error)
 	CreateUserAccount(ctx context.Context, req entity.UserEntity) error
+	
+
 }
 
 type userRepository struct {
@@ -53,6 +55,7 @@ func (u *userRepository) CreateUserAccount(ctx context.Context, req entity.UserE
 
 	return nil
 }
+
 
 // GetUserByEmail implements [UserRepositoryInterface].
 func (u *userRepository) GetUserByEmail(ctx context.Context, email string) (*entity.UserEntity, error) {
