@@ -18,10 +18,48 @@ type UserHandlerInterface interface {
 	SignIn(ctx echo.Context) error
 	CreateUserAccount(ctx echo.Context) error
 	ForgotPassword(ctx echo.Context) error
+	VerifyAccount(ctx echo.Context) error
 }
 
 type userHandler struct {
 	userService service.UserServiceInterface
+}
+
+// VerifyAccount implements [UserHandlerInterface].
+func (u *userHandler) VerifyAccount(c echo.Context) error {
+	var (
+		resp       = response.DefaultResponse{}
+		respSignin = response.SignInResponse{}
+		ctx        = c.Request().Context()
+	)
+
+	token := c.QueryParam("token")
+	if token == "" {
+		log.Errorf("[VerifyAccount-1] VerifyAccount: %s", "missing or invalid token")
+		resp.Message = "missing or invalid token"
+		resp.Data = nil
+		return c.JSON(http.StatusUnauthorized, resp)
+	}
+	user, err := u.userService.VerifyToken(ctx, token)
+	if err != nil {
+		if err.Error() == "user not found" {
+			log.Errorf("[VerifyAccount-1] VerifyAccount: %s", "user not found")
+			resp.Message = "user not found"
+			resp.Data = nil
+			return c.JSON(http.StatusUnauthorized, resp)
+		}
+		log.Errorf("[VerifyAccount-2] VerifyAccount: %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusUnauthorized, resp)
+	}
+	respSignin.ID = user.ID
+	respSignin.Name = user.Name
+	respSignin.Email = user.Email
+	respSignin.AccessToken = user.Token
+	resp.Message = "success"
+	resp.Data = respSignin
+	return c.JSON(http.StatusOK, resp)
 }
 
 // ForgotPassword implements [UserHandlerInterface].
@@ -196,6 +234,7 @@ func NewUserHandler(e *echo.Echo, userService service.UserServiceInterface, cfg 
 	e.POST("/signin", userHandler.SignIn)
 	e.POST("/signup", userHandler.CreateUserAccount)
 	e.POST("/forgot-password", userHandler.ForgotPassword)
+	e.GET("/verify-account", userHandler.VerifyAccount)
 
 	mid := adapter.NewMiddlewareAdapter(cfg)
 	adminGroup := e.Group("/admin", mid.CheckToken())

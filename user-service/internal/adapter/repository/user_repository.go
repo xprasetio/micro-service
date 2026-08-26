@@ -14,12 +14,50 @@ import (
 type UserRepositoryInterface interface {
 	GetUserByEmail(ctx context.Context, email string) (*entity.UserEntity, error)
 	CreateUserAccount(ctx context.Context, req entity.UserEntity) error
-	
-
+	UpdateUserVerified(ctx context.Context, userID int64) (*entity.UserEntity, error)
 }
 
 type userRepository struct {
 	db *gorm.DB
+}
+
+// UpdateUserVerified implements [UserRepositoryInterface].
+func (u *userRepository) UpdateUserVerified(ctx context.Context, userID int64) (*entity.UserEntity, error) {
+	modelUser := model.User{}
+	if err := u.db.WithContext(ctx).Where("id = ?", userID).Preload("Roles").First(&modelUser).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			err = errors.New("user not found")
+			log.Errorf("[UserRepository-1] UpdateUserVerified: %v", err)
+			return nil, err
+		}
+		log.Errorf("[UserRepository-1] UpdateUserVerified: %v", err)
+		return nil, err
+	}
+	modelUser.IsVerified = true
+	if err := u.db.WithContext(ctx).Save(&modelUser).Error; err != nil {
+		log.Errorf("[UserRepository-2] UpdateUserVerified: %v", err)
+		return nil, err
+	}
+	if len(modelUser.Roles) == 0 {
+		err := errors.New("user role not found")
+
+		log.Errorf("[UserRepository-3] UpdateUserVerified: %v", err)
+
+		return nil, err
+	}
+	return &entity.UserEntity{
+		ID:         modelUser.ID,
+		Name:       modelUser.Name,
+		Email:      modelUser.Email,
+		Password:   modelUser.Password,
+		RoleName:   modelUser.Roles[0].Name,
+		Address:    modelUser.Address,
+		Phone:      modelUser.Phone,
+		Photo:      modelUser.Photo,
+		Lat:        modelUser.Lat,
+		Lng:        modelUser.Lng,
+		IsVerified: modelUser.IsVerified,
+	}, nil
 }
 
 // CreateUserAccount implements [UserRepositoryInterface].
@@ -55,7 +93,6 @@ func (u *userRepository) CreateUserAccount(ctx context.Context, req entity.UserE
 
 	return nil
 }
-
 
 // GetUserByEmail implements [UserRepositoryInterface].
 func (u *userRepository) GetUserByEmail(ctx context.Context, email string) (*entity.UserEntity, error) {
