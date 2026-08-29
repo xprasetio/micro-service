@@ -22,10 +22,70 @@ type UserHandlerInterface interface {
 	VerifyAccount(ctx echo.Context) error
 	UpdatePassword(ctx echo.Context) error
 	GetProfileUser(ctx echo.Context) error
+	UpdateDataUser(ctx echo.Context) error
 }
 
 type userHandler struct {
 	userService service.UserServiceInterface
+}
+
+// UpdateDataUser implements [UserHandlerInterface].
+func (u *userHandler) UpdateDataUser(c echo.Context) error {
+	var (
+		resp        = response.DefaultResponse{}
+		req         = request.UpdateDataUserRequest{}
+		ctx         = c.Request().Context()
+		jwtUserData = entity.JwtUserData{}
+	)
+
+	user := c.Get("user").(string)
+	if user == "" {
+		log.Errorf("[UpdateDataUser-1] UpdateDataUser: %s", "user not found")
+		resp.Message = "user not found"
+		resp.Data = nil
+		return c.JSON(http.StatusUnauthorized, resp)
+	}
+	err := json.Unmarshal([]byte(user), &jwtUserData)
+	if err != nil {
+		log.Errorf("[UpdateDataUser-2] UpdateDataUser: %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusBadRequest, resp)
+	}
+	userID := jwtUserData.UserID
+	if err := c.Bind(&req); err != nil {
+		log.Errorf("[UpdateDataUser-3] UpdateDataUser: %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusUnprocessableEntity, resp)
+	}
+
+	if err = c.Validate(req); err != nil {
+		log.Errorf("[UpdateDataUser-4] UpdateDataUser: %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusUnprocessableEntity, resp)
+	}
+
+	reqEntity := entity.UserEntity{
+		ID:      userID,
+		Name:    req.Name,
+		Email:   req.Email,
+		Address: req.Address,
+		Phone:   req.Phone,
+		Photo:   req.Photo,
+		Lat:     req.Lat,
+		Lng:     req.Lng,
+	}
+
+	err = u.userService.UpdateDataUser(ctx, reqEntity)
+	if err != nil {
+		log.Errorf("[UpdateDataUser-4] UpdateDataUser: %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusBadRequest, resp)
+	}
+	return c.JSON(http.StatusOK, resp)
 }
 
 // GetProfileUser implements [UserHandlerInterface].
@@ -346,6 +406,9 @@ func NewUserHandler(e *echo.Echo, userService service.UserServiceInterface, cfg 
 	adminGroup.GET("/check", func(c echo.Context) error {
 		return c.String(200, "ok")
 	})
+
+	authGroup := e.Group("/auth", mid.CheckToken())
+	authGroup.PUT("/profile", userHandler.UpdateDataUser)
 
 	return userHandler
 }
