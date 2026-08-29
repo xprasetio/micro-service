@@ -29,11 +29,16 @@ type RabbitMQ struct {
 	User     string `mapstructure:"RABBITMQ_USER" json:"rabbitmq_user" yaml:"RABBITMQ_USER"`
 	Password string `mapstructure:"RABBITMQ_PASSWORD" json:"rabbitmq_password" yaml:"RABBITMQ_PASSWORD"`
 }
+type Supabase struct {
+	URL    string `mapstructure:"SUPABASE_URL" json:"supabase_url" yaml:"SUPABASE_URL"`
+	Key    string `mapstructure:"SUPABASE_KEY" json:"supabase_key" yaml:"SUPABASE_KEY"`
+	Bucket string `mapstructure:"SUPABASE_BUCKET" json:"supabase_bucket" yaml:"SUPABASE_BUCKET"`
+}
 type Config struct {
-	App  App    `mapstructure:"app" json:"app" yaml:"app"`
-	Psql PsqlDB `mapstructure:"psql" json:"psql" yaml:"psql"`
-
+	App      App      `mapstructure:"app" json:"app" yaml:"app"`
+	Psql     PsqlDB   `mapstructure:"psql" json:"psql" yaml:"psql"`
 	RabbitMQ RabbitMQ `mapstructure:"rabbitmq" json:"rabbitmq" yaml:"rabbitmq"`
+	Supabase Supabase `mapstructure:"supabase" json:"supabase" yaml:"supabase"`
 }
 
 func NewConfig() *Config {
@@ -62,6 +67,12 @@ func NewConfig() *Config {
 			Port:     viper.GetString("RABBITMQ_PORT"),
 			User:     viper.GetString("RABBITMQ_USER"),
 			Password: viper.GetString("RABBITMQ_PASSWORD"),
+		},
+
+		Supabase: Supabase{
+			URL:    viper.GetString("SUPABASE_STORAGE_URL"),
+			Key:    viper.GetString("SUPABASE_STORAGE_KEY"),
+			Bucket: viper.GetString("SUPABASE_STORAGE_BUCKET"),
 		},
 	}
 }
