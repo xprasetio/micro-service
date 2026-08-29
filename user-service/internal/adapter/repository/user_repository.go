@@ -16,10 +16,37 @@ type UserRepositoryInterface interface {
 	CreateUserAccount(ctx context.Context, req entity.UserEntity) error
 	UpdateUserVerified(ctx context.Context, userID int64) (*entity.UserEntity, error)
 	UpdatePasswordByID(ctx context.Context, req entity.UserEntity) error
+	GetUserByID(ctx context.Context, userID int64) (*entity.UserEntity, error)
 }
 
 type userRepository struct {
 	db *gorm.DB
+}
+
+// GetUserByID implements [UserRepositoryInterface].
+func (u *userRepository) GetUserByID(ctx context.Context, userID int64) (*entity.UserEntity, error) {
+	modelUser := model.User{}
+	if err := u.db.WithContext(ctx).Where("id = ? AND is_verified = TRUE", userID).Preload("Roles").First(&modelUser).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			err = errors.New("404")
+			log.Errorf("[UserRepository-1] GetUserByID: %v", err)
+			return nil, err
+		}
+		log.Errorf("[UserRepository-1] GetUserByID: %v", err)
+		return nil, err
+	}
+	return &entity.UserEntity{
+		ID:       modelUser.ID,
+		Name:     modelUser.Name,
+		Email:    modelUser.Email,
+		RoleName: modelUser.Roles[0].Name,
+		Lat:      modelUser.Lat,
+		Lng:      modelUser.Lng,
+		Address:  modelUser.Address,
+		Phone:    modelUser.Phone,
+		Photo:    modelUser.Photo,
+	}, nil
+
 }
 
 // UpdatePasswordByID implements [UserRepositoryInterface].

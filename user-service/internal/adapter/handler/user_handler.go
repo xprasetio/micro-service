@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"net/http"
 	"user-service/config"
 	"user-service/internal/adapter"
@@ -20,10 +21,57 @@ type UserHandlerInterface interface {
 	ForgotPassword(ctx echo.Context) error
 	VerifyAccount(ctx echo.Context) error
 	UpdatePassword(ctx echo.Context) error
+	GetProfileUser(ctx echo.Context) error
 }
 
 type userHandler struct {
 	userService service.UserServiceInterface
+}
+
+// GetProfileUser implements [UserHandlerInterface].
+func (u *userHandler) GetProfileUser(c echo.Context) error {
+	var (
+		resp        = response.DefaultResponse{}
+		respProfile = response.ProfileResponse{}
+		ctx         = c.Request().Context()
+		jwtUserData = entity.JwtUserData{}
+	)
+	user := c.Get("user").(string)
+	if user == "" {
+		log.Errorf("[GetProfileUser-1] GetProfileUser: %s", "user not found")
+		resp.Message = "user not found"
+		resp.Data = nil
+		return c.JSON(http.StatusUnauthorized, resp)
+	}
+	err := json.Unmarshal([]byte(user), &jwtUserData)
+	if err != nil {
+		log.Errorf("[GetProfileUser-2] GetProfileUser: %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusBadRequest, resp)
+	}
+	userID := jwtUserData.UserID
+	dataUser, err := u.userService.GetProfileUser(ctx, userID)
+	if err != nil {
+		log.Errorf("[GetProfileUser-3] GetProfileUser: %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusBadRequest, resp)
+	}
+	resp.Message = "success"
+	respProfile.Name = dataUser.Name
+	respProfile.Email = dataUser.Email
+	respProfile.ID = dataUser.ID
+	respProfile.Address = dataUser.Address
+	respProfile.Phone = dataUser.Phone
+	respProfile.Photo = dataUser.Photo
+	respProfile.RoleName = dataUser.RoleName
+	respProfile.Lat = dataUser.Lat
+	respProfile.Lng = dataUser.Lng
+	resp.Data = respProfile
+
+	return c.JSON(http.StatusOK, resp)
+
 }
 
 // VerifyAccount implements [UserHandlerInterface].
@@ -271,7 +319,7 @@ func (u *userHandler) UpdatePassword(c echo.Context) error {
 	return c.JSON(http.StatusOK, resp)
 }
 
-func NewUserHandler(e *echo.Echo, userService service.UserServiceInterface, cfg *config.Config) UserHandlerInterface {
+func NewUserHandler(e *echo.Echo, userService service.UserServiceInterface, cfg *config.Config, jwtService service.JwtServiceInterface) UserHandlerInterface {
 	if e == nil {
 		panic("echo is nil")
 	}
@@ -292,8 +340,9 @@ func NewUserHandler(e *echo.Echo, userService service.UserServiceInterface, cfg 
 	e.GET("/verify-account", userHandler.VerifyAccount)
 	e.PUT("/update-password", userHandler.UpdatePassword)
 
-	mid := adapter.NewMiddlewareAdapter(cfg)
+	mid := adapter.NewMiddlewareAdapter(cfg, jwtService)
 	adminGroup := e.Group("/admin", mid.CheckToken())
+	adminGroup.GET("/profile", userHandler.GetProfileUser)
 	adminGroup.GET("/check", func(c echo.Context) error {
 		return c.String(200, "ok")
 	})

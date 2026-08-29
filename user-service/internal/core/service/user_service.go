@@ -22,6 +22,7 @@ type UserServiceInterface interface {
 	ForgotPassword(ctx context.Context, req entity.UserEntity) error
 	VerifyToken(ctx context.Context, token string) (*entity.UserEntity, error)
 	UpdatePassword(ctx context.Context, req entity.UserEntity) error
+	GetProfileUser(ctx context.Context, userID int64) (*entity.UserEntity, error)
 }
 
 type userService struct {
@@ -29,6 +30,11 @@ type userService struct {
 	cfg            *config.Config
 	jwtService     JwtServiceInterface
 	repoToken      repository.VerificationTokenRepositoryInterface
+}
+
+// GetProfileUser implements [UserServiceInterface].
+func (u *userService) GetProfileUser(ctx context.Context, userID int64) (*entity.UserEntity, error) {
+	return u.userRepository.GetUserByID(ctx, userID)
 }
 
 // UpdatePassword implements [UserServiceInterface].

@@ -14,3 +14,15 @@ type SignInResponse struct {
 	Lng          string `json:"lng"`
 	IsVerified   bool   `json:"is_verified"`
 }
+
+type ProfileResponse struct {
+	RoleName string `json:"role"`
+	ID       int64  `json:"id"`
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	Address  string `json:"address"`
+	Phone    string `json:"phone"`
+	Photo    string `json:"photo"`
+	Lat      string `json:"lat"`
+	Lng      string `json:"lng"`
+}

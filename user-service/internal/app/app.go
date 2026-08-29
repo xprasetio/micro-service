@@ -40,7 +40,7 @@ func RunServer() {
 		return c.String(200, "ok")
 	})
 
-	handler.NewUserHandler(e, userService, cfg)
+	handler.NewUserHandler(e, userService, cfg, jwtService)
 	go func() {
 		if cfg.App.AppPort == "" {
 			cfg.App.AppPort = os.Getenv("APP_PORT")
