@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 	"user-service/config"
@@ -19,6 +21,7 @@ type UserServiceInterface interface {
 	CreateUserAccount(ctx context.Context, req entity.UserEntity) error
 	ForgotPassword(ctx context.Context, req entity.UserEntity) error
 	VerifyToken(ctx context.Context, token string) (*entity.UserEntity, error)
+	UpdatePassword(ctx context.Context, req entity.UserEntity) error
 }
 
 type userService struct {
@@ -26,6 +29,33 @@ type userService struct {
 	cfg            *config.Config
 	jwtService     JwtServiceInterface
 	repoToken      repository.VerificationTokenRepositoryInterface
+}
+
+// UpdatePassword implements [UserServiceInterface].
+func (u *userService) UpdatePassword(ctx context.Context, req entity.UserEntity) error {
+	token, err := u.repoToken.GetDataByToken(ctx, req.Token)
+	if err != nil {
+		log.Errorf("[UserService-1] UpdatePassword: %v", err)
+		return err
+	}
+	if token.TokenType != "reset_password" {
+		err = errors.New("invalid token")
+		log.Errorf("[UserService-2] UpdatePassword: %v", err)
+		return err
+	}
+	password, err := conv.HashPassword(req.Password)
+	if err != nil {
+		log.Errorf("[UserService-3] UpdatePassword: %v", err)
+		return err
+	}
+	req.Password = password
+	req.ID = token.UserID
+	err = u.userRepository.UpdatePasswordByID(ctx, req)
+	if err != nil {
+		log.Errorf("[UserService-4] UpdatePassword: %v", err)
+		return err
+	}
+	return nil
 }
 
 // VerifyToken implements [UserServiceInterface].
@@ -52,14 +82,29 @@ func (u *userService) VerifyToken(ctx context.Context, token string) (*entity.Us
 		"email":      userVerify.Email,
 		"logged_in":  true,
 		"created_at": time.Now().String(),
-		"token":      token,
+		"token":      accessToken,
 	}
-	redisConn := config.NewRedisClient()
-	if err := redisConn.HSet(ctx, token, sessionData).Err(); err != nil {
-		log.Errorf("[UserService-4] VerifyToken: %v", err)
+
+	sessionJSON, err := json.Marshal(sessionData)
+	if err != nil {
+		log.Errorf("[UserService-4] VerifyToken Marshal: %v", err)
 		return nil, err
 	}
+
+	redisConn := config.NewRedisClient()
+
+	if err := redisConn.Set(
+		ctx,
+		accessToken,
+		sessionJSON,
+		22*time.Hour,
+	).Err(); err != nil {
+		log.Errorf("[UserService-5] VerifyToken Redis: %v", err)
+		return nil, err
+	}
+
 	userVerify.Token = accessToken
+
 	return userVerify, nil
 }
 
@@ -75,7 +120,7 @@ func (u *userService) ForgotPassword(ctx context.Context, req entity.UserEntity)
 	err = u.repoToken.CreateVerificationToken(ctx, entity.VerificationToken{
 		UserID:    user.ID,
 		Token:     req.Token,
-		TokenType: "forgot_password",
+		TokenType: "reset_password",
 		ExpiresAt: time.Now().Add(time.Hour * 1),
 	})
 	if err != nil {
@@ -85,7 +130,7 @@ func (u *userService) ForgotPassword(ctx context.Context, req entity.UserEntity)
 
 	urlReset := fmt.Sprintf("%s/forgot-password?token=%s", u.cfg.App.UrlForgotPassword, req.Token)
 	messageParam := fmt.Sprintf("Please reset your password with click link below : %v", urlReset)
-	err = message.PublishMessage(req.Email, messageParam, "forgot_password")
+	err = message.PublishMessage(req.Email, messageParam, "reset_password")
 	if err != nil {
 		log.Errorf("[UserService-3] ForgotPassword: %v", err)
 		return err
@@ -122,16 +167,25 @@ func (u *userService) CreateUserAccount(ctx context.Context, req entity.UserEnti
 }
 
 // SignIn implements [UserServiceInterface].
-func (u *userService) SignIn(ctx context.Context, req entity.UserEntity) (*entity.UserEntity, string, error) {
+func (u *userService) SignIn(
+	ctx context.Context,
+	req entity.UserEntity,
+) (*entity.UserEntity, string, error) {
+
 	user, err := u.userRepository.GetUserByEmail(ctx, req.Email)
 	if err != nil {
 		log.Errorf("[UserService-1] SignIn: %v", err)
 		return nil, "", err
 	}
 
-	if checkPass := conv.CheckPasswordHash(req.Password, user.Password); !checkPass {
-		log.Errorf("[UserService-2] SignIn: %v", err)
-		return nil, "", err
+	if user == nil {
+		log.Warnf("[UserService-2] SignIn: user not found")
+		return nil, "", errors.New("invalid email or password")
+	}
+
+	if !conv.CheckPasswordHash(req.Password, user.Password) {
+		log.Warnf("[UserService-2] SignIn: invalid credentials")
+		return nil, "", errors.New("invalid email or password")
 	}
 
 	token, err := u.jwtService.GenerateToken(user.ID)
@@ -150,8 +204,20 @@ func (u *userService) SignIn(ctx context.Context, req entity.UserEntity) (*entit
 	}
 
 	redisConn := config.NewRedisClient()
-	if err := redisConn.HSet(ctx, token, sessionData).Err(); err != nil {
-		log.Errorf("[UserService-4] SignIn: %v", err)
+
+	sessionJSON, err := json.Marshal(sessionData)
+	if err != nil {
+		log.Errorf("[UserService-4] SignIn marshal session: %v", err)
+		return nil, "", err
+	}
+
+	if err := redisConn.Set(
+		ctx,
+		token,
+		sessionJSON,
+		23*time.Hour,
+	).Err(); err != nil {
+		log.Errorf("[UserService-5] SignIn redis: %v", err)
 		return nil, "", err
 	}
 

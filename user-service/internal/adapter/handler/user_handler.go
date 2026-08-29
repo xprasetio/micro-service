@@ -19,6 +19,7 @@ type UserHandlerInterface interface {
 	CreateUserAccount(ctx echo.Context) error
 	ForgotPassword(ctx echo.Context) error
 	VerifyAccount(ctx echo.Context) error
+	UpdatePassword(ctx echo.Context) error
 }
 
 type userHandler struct {
@@ -216,6 +217,60 @@ func (u *userHandler) SignIn(c echo.Context) error {
 	return c.JSON(200, resp)
 }
 
+func (u *userHandler) UpdatePassword(c echo.Context) error {
+	var (
+		req  = request.UpdatePasswordRequest{}
+		resp = response.DefaultResponse{}
+		ctx  = c.Request().Context()
+	)
+	tokenString := c.QueryParam("token")
+	if tokenString == "" {
+		log.Errorf("[UpdatePassword-1] UpdatePassword: %s", "missing or invalid token")
+		resp.Message = "missing or invalid token"
+		resp.Data = nil
+		return c.JSON(http.StatusUnauthorized, resp)
+	}
+	if err := c.Bind(&req); err != nil {
+		log.Errorf("[UpdatePassword-2] UpdatePassword: %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusUnprocessableEntity, resp)
+	}
+
+	if err = c.Validate(req); err != nil {
+		log.Errorf("[UpdatePassword-3] UpdatePassword: %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusUnprocessableEntity, resp)
+	}
+	if req.NewPassword != req.NewPasswordConfirmation {
+		log.Errorf("[UpdatePassword-4] UpdatePassword: %v", err)
+		resp.Message = "password and password confirmation does not match"
+		resp.Data = nil
+		return c.JSON(http.StatusUnprocessableEntity, resp)
+	}
+	reqEntity := entity.UserEntity{
+		Password: req.NewPassword,
+		Token:    tokenString,
+	}
+	err := u.userService.UpdatePassword(ctx, reqEntity)
+	if err != nil {
+		if err.Error() == "user not found" {
+			log.Errorf("[UserHandler-1] UpdatePassword: %v", err)
+			resp.Message = err.Error()
+			resp.Data = nil
+			return c.JSON(http.StatusNotFound, resp)
+		}
+		log.Errorf("[UserHandler-1] UpdatePassword: %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusInternalServerError, resp)
+	}
+	resp.Message = "Success Update Password"
+	resp.Data = nil
+	return c.JSON(http.StatusOK, resp)
+}
+
 func NewUserHandler(e *echo.Echo, userService service.UserServiceInterface, cfg *config.Config) UserHandlerInterface {
 	if e == nil {
 		panic("echo is nil")
@@ -235,6 +290,7 @@ func NewUserHandler(e *echo.Echo, userService service.UserServiceInterface, cfg 
 	e.POST("/signup", userHandler.CreateUserAccount)
 	e.POST("/forgot-password", userHandler.ForgotPassword)
 	e.GET("/verify-account", userHandler.VerifyAccount)
+	e.PUT("/update-password", userHandler.UpdatePassword)
 
 	mid := adapter.NewMiddlewareAdapter(cfg)
 	adminGroup := e.Group("/admin", mid.CheckToken())
