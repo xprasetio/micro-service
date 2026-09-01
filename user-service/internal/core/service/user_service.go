@@ -95,6 +95,7 @@ func (u *userService) VerifyToken(ctx context.Context, token string) (*entity.Us
 		"logged_in":  true,
 		"created_at": time.Now().String(),
 		"token":      accessToken,
+		"role_name":  userVerify.RoleName,
 	}
 
 	sessionJSON, err := json.Marshal(sessionData)
@@ -213,6 +214,7 @@ func (u *userService) SignIn(
 		"logged_in":  true,
 		"created_at": time.Now().String(),
 		"token":      token,
+		"role_name":  user.RoleName,
 	}
 
 	redisConn := config.NewRedisClient()

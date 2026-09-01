@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"user-service/config"
@@ -34,6 +35,27 @@ func (r *roleHandler) Create(c echo.Context) error {
 		resp = response.DefaultResponse{}
 		ctx  = c.Request().Context()
 	)
+	user := c.Get("user").(string)
+	if user == "" {
+		log.Errorf("[CreateRole-0] CreateRole: %s", "user not found")
+		resp.Message = "user not found"
+		resp.Data = nil
+		return c.JSON(http.StatusUnauthorized, resp)
+	}
+	jwtUserData := entity.JwtUserData{}
+	err := json.Unmarshal([]byte(user), &jwtUserData)
+	if err != nil {
+		log.Errorf("[CreateRole-0] CreateRole: %v", err)
+		resp.Message = "user not found"
+		resp.Data = nil
+		return c.JSON(http.StatusUnauthorized, resp)
+	}
+	if jwtUserData.RoleName != "admin" {
+		log.Errorf("[CreateRole-0] CreateRole: %s", "user is not admin")
+		resp.Message = "user is not admin"
+		resp.Data = nil
+		return c.JSON(http.StatusUnauthorized, resp)
+	}
 	if err := c.Bind(&req); err != nil {
 		log.Errorf("[CreateRole-1] CreateRole: %v", err)
 		resp.Message = err.Error()
@@ -50,7 +72,7 @@ func (r *roleHandler) Create(c echo.Context) error {
 	reqEntity := entity.RoleEntity{
 		Name: req.Name,
 	}
-	err := r.roleService.Create(ctx, reqEntity)
+	err = r.roleService.Create(ctx, reqEntity)
 	if err != nil {
 		log.Errorf("[CreateRole-3] CreateRole: %v", err)
 		resp.Message = err.Error()
@@ -68,6 +90,27 @@ func (r *roleHandler) Delete(c echo.Context) error {
 		resp = response.DefaultResponse{}
 		ctx  = c.Request().Context()
 	)
+	user := c.Get("user").(string)
+	if user == "" {
+		log.Errorf("[DeleteRole-0] DeleteRole: %s", "user not found")
+		resp.Message = "user not found"
+		resp.Data = nil
+		return c.JSON(http.StatusUnauthorized, resp)
+	}
+	jwtUserData := entity.JwtUserData{}
+	err := json.Unmarshal([]byte(user), &jwtUserData)
+	if err != nil {
+		log.Errorf("[DeleteRole-0] DeleteRole: %v", err)
+		resp.Message = "user not found"
+		resp.Data = nil
+		return c.JSON(http.StatusUnauthorized, resp)
+	}
+	if jwtUserData.RoleName != "admin" {
+		log.Errorf("[DeleteRole-0] DeleteRole: %s", "user is not admin")
+		resp.Message = "user is not admin"
+		resp.Data = nil
+		return c.JSON(http.StatusUnauthorized, resp)
+	}
 	roleIDString := c.Param("id")
 
 	if err != nil {
@@ -102,6 +145,27 @@ func (r *roleHandler) GetAll(c echo.Context) error {
 		respRole = []response.RoleResponse{}
 		ctx      = c.Request().Context()
 	)
+	// user := c.Get("user").(string)
+	// if user == "" {
+	// 	log.Errorf("[GetAllRole-0] GetAllRole: %s", "user not found")
+	// 	resp.Message = "user not found"
+	// 	resp.Data = nil
+	// 	return c.JSON(http.StatusUnauthorized, resp)
+	// }
+	// jwtUserData := entity.JwtUserData{}
+	// err := json.Unmarshal([]byte(user), &jwtUserData)
+	// if err != nil {
+	// 	log.Errorf("[GetAllRole-0] GetAllRole: %v", err)
+	// 	resp.Message = "user not found"
+	// 	resp.Data = nil
+	// 	return c.JSON(http.StatusUnauthorized, resp)
+	// }
+	// if jwtUserData.RoleName != "admin" {
+	// 	log.Errorf("[GetAllRole-0] GetAllRole: %s", "user is not admin")
+	// 	resp.Message = "user is not admin"
+	// 	resp.Data = nil
+	// 	return c.JSON(http.StatusUnauthorized, resp)
+	// }
 	search := c.QueryParam("search")
 	if err != nil {
 		log.Errorf("[GetAllRole-1] GetAllRole: %v", err)
@@ -134,6 +198,27 @@ func (r *roleHandler) GetByID(c echo.Context) error {
 		respRole = response.RoleResponse{}
 		ctx      = c.Request().Context()
 	)
+	user := c.Get("user").(string)
+	if user == "" {
+		log.Errorf("[GetRole-0] GetRole: %s", "user not found")
+		resp.Message = "user not found"
+		resp.Data = nil
+		return c.JSON(http.StatusUnauthorized, resp)
+	}
+	jwtUserData := entity.JwtUserData{}
+	err := json.Unmarshal([]byte(user), &jwtUserData)
+	if err != nil {
+		log.Errorf("[GetRole-0] GetRole: %v", err)
+		resp.Message = "user not found"
+		resp.Data = nil
+		return c.JSON(http.StatusUnauthorized, resp)
+	}
+	if jwtUserData.RoleName != "admin" {
+		log.Errorf("[GetRole-0] GetRole: %s", "user is not admin")
+		resp.Message = "user is not admin"
+		resp.Data = nil
+		return c.JSON(http.StatusUnauthorized, resp)
+	}
 	roleIDString := c.Param("id")
 	roleID, err := strconv.Atoi(roleIDString)
 	if err != nil {
@@ -164,10 +249,31 @@ func (r *roleHandler) GetByID(c echo.Context) error {
 // UpdateRole implements [RoleHandlerInterface].
 func (r *roleHandler) Update(c echo.Context) error {
 	var (
-		req  = request.RoleRequest{}
-		resp = response.DefaultResponse{}
-		ctx  = c.Request().Context()
+		req         = request.RoleRequest{}
+		resp        = response.DefaultResponse{}
+		ctx         = c.Request().Context()
+		jwtUserData = entity.JwtUserData{}
 	)
+	user := c.Get("user").(string)
+	if user == "" {
+		log.Errorf("[UpdateRole-0] UpdateRole: %s", "user not found")
+		resp.Message = "user not found"
+		resp.Data = nil
+		return c.JSON(http.StatusUnauthorized, resp)
+	}
+	err := json.Unmarshal([]byte(user), &jwtUserData)
+	if err != nil {
+		log.Errorf("[UpdateRole-0] UpdateRole: %v", err)
+		resp.Message = "user not found"
+		resp.Data = nil
+		return c.JSON(http.StatusUnauthorized, resp)
+	}
+	if jwtUserData.RoleName != "admin" {
+		log.Errorf("[UpdateRole-0] UpdateRole: %s", "user is not admin")
+		resp.Message = "user is not admin"
+		resp.Data = nil
+		return c.JSON(http.StatusUnauthorized, resp)
+	}
 	roleIDString := c.Param("id")
 	if roleIDString == "" {
 		log.Errorf("[UpdateRole-1] UpdateRole: %s", "role id not found")

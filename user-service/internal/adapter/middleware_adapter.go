@@ -1,11 +1,13 @@
 package adapter
 
 import (
+	"encoding/json"
 	"net/http"
 	"strings"
 	"user-service/config"
 	"user-service/internal/adapter/handler/response"
 
+	"user-service/internal/core/domain/entity"
 	"user-service/internal/core/service"
 
 	"github.com/labstack/echo/v4"
@@ -53,6 +55,24 @@ func (m *middlewareAdapter) CheckToken() echo.MiddlewareFunc {
 
 				return c.JSON(http.StatusInternalServerError, respErr)
 			}
+			//validate if admin
+			jwtUserData := entity.JwtUserData{}
+			err = json.Unmarshal([]byte(getSession), &jwtUserData)
+			if err != nil {
+				log.Errorf("[MiddlewareAdapter-3] CheckToken: %v", err)
+				respErr.Message = "internal server error"
+				respErr.Data = nil
+				return c.JSON(http.StatusInternalServerError, respErr)
+			}
+			path := c.Request().URL.Path
+			segments := strings.Split(strings.Trim(path, "/"), "/")
+			if jwtUserData.RoleName != "admin" && len(segments) > 1 && segments[1] == "roles" {
+				log.Errorf("[MiddlewareAdapter-4] CheckToken: %s", "user is not admin")
+				respErr.Message = "user is not admin"
+				respErr.Data = nil
+				return c.JSON(http.StatusUnauthorized, respErr)
+			}
+
 			c.Set("user", getSession)
 			return next(c)
 		}
