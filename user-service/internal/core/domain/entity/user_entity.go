@@ -14,3 +14,11 @@ type UserEntity struct {
 	RoleName   string `json:"role_name"`
 	Token      string `json:"token"`
 }
+
+type QueryStringCustomer struct {
+	Search    string `form:"search"`
+	Page      int    `form:"page"`
+	Limit     int    `form:"limit"`
+	OrderBy   string `form:"sort"`
+	OrderType string `form:"order"`
+}

@@ -3,6 +3,8 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
+	"math"
 	"time"
 	"user-service/internal/core/domain/entity"
 	"user-service/internal/core/domain/model"
@@ -18,10 +20,62 @@ type UserRepositoryInterface interface {
 	UpdatePasswordByID(ctx context.Context, req entity.UserEntity) error
 	GetUserByID(ctx context.Context, userID int64) (*entity.UserEntity, error)
 	UpdateDataUser(ctx context.Context, req entity.UserEntity) error
+
+	// Modul Customer Admin
+	GetCustomerAll(ctx context.Context, query entity.QueryStringCustomer) ([]entity.UserEntity, int64, int64, error)
 }
 
 type userRepository struct {
 	db *gorm.DB
+}
+
+// GetAllUser implements [UserRepositoryInterface].
+func (u *userRepository) GetCustomerAll(ctx context.Context, query entity.QueryStringCustomer) ([]entity.UserEntity, int64, int64, error) {
+	modelUsers := []model.User{}
+	var countData int64
+	order := fmt.Sprintf("%s %s", query.OrderBy, query.OrderType)
+	offset := (query.Page - 1) * query.Limit
+
+	sqlMain := u.db.WithContext(ctx).Model(&model.User{}).Preload("Roles", "name = ?", "Customer").
+		Where("name LIKE ? OR email LIKE ? OR phone LIKE ?", "%"+query.Search+"%", "%"+query.Search+"%", "%"+query.Search+"%").
+		Order(order).
+		Offset(offset).
+		Limit(query.Limit)
+
+	if err := sqlMain.Model(&modelUsers).Count(&countData).Error; err != nil {
+		log.Errorf("[UserRepository-1] GetCustomerAll: %v", err)
+		return nil, 0, 0, err
+	}
+
+	totalPage := int(math.Ceil(float64(countData) / float64(query.Limit)))
+
+	if err := sqlMain.Order(order).Limit(query.Limit).Find(&modelUsers).Error; err != nil {
+		log.Errorf("[UserRepository-1] GetCustomerAll: %v", err)
+		return nil, 0, 0, err
+	}
+
+	userEntities := make([]entity.UserEntity, len(modelUsers))
+	for i, modelUser := range modelUsers {
+		userEntities[i] = entity.UserEntity{
+			ID:         modelUser.ID,
+			Name:       modelUser.Name,
+			Email:      modelUser.Email,
+			Phone:      modelUser.Phone,
+			Photo:      modelUser.Photo,
+			RoleName:   modelUser.Roles[0].Name,
+			IsVerified: modelUser.IsVerified,
+		}
+		if len(modelUser.Roles) > 0 {
+			err := errors.New("404")
+			if len(modelUser.Roles) == 0 {
+				log.Errorf("[UserRepository-2] GetCustomerAll: %v", err)
+				return nil, 0, 0, err
+			}
+			userEntities[i].RoleName = modelUser.Roles[0].Name
+		}
+	}
+
+	return userEntities, countData, int64(totalPage), nil
 }
 
 // UpdateDataUser implements [UserRepositoryInterface].

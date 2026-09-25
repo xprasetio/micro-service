@@ -9,6 +9,7 @@ import (
 	"user-service/internal/adapter/handler/response"
 	"user-service/internal/core/domain/entity"
 	"user-service/internal/core/service"
+	"user-service/utils/conv"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -23,10 +24,89 @@ type UserHandlerInterface interface {
 	UpdatePassword(ctx echo.Context) error
 	GetProfileUser(ctx echo.Context) error
 	UpdateDataUser(ctx echo.Context) error
+
+	//modul customer admin
+	GetCustomerAll(ctx echo.Context) error
 }
 
 type userHandler struct {
 	userService service.UserServiceInterface
+}
+
+func (u *userHandler) GetCustomerAll(c echo.Context) error {
+	var (
+		resp     = response.DefaultResponsePagination{}
+		ctx      = c.Request().Context()
+		respUser = []response.ProfileResponse{}
+	)
+	user := c.Get("user").(string)
+	if user == "" {
+		log.Errorf("[GetCustomerAll-1] GetCustomerAll: %s", "user not found")
+		resp.Message = "user not found"
+		resp.Data = nil
+		return c.JSON(http.StatusNotFound, resp)
+	}
+	search := c.QueryParam("search")
+	sortBy := c.QueryParam("sort_by")
+	orderBy := c.QueryParam("order_by")
+
+	pageStr := c.QueryParam("page")
+	var page int64 = 1
+	if pageStr != "" {
+		page, _ := conv.StringToInt64(pageStr)
+		if page <= 0 {
+			page = 1
+		}
+	}
+	limitStr := c.QueryParam("limit")
+	var limit int64 = 10
+	if limitStr != "" {
+		limit, _ := conv.StringToInt64(limitStr)
+		if limit <= 0 {
+			limit = 10
+		}
+	}
+	reqEntity := entity.QueryStringCustomer{
+		Search:    search,
+		Page:      int(page),
+		Limit:     int(limit),
+		OrderBy:   sortBy,
+		OrderType: orderBy,
+	}
+	results, countData, totalPage, err := u.userService.GetCustomerAll(ctx, reqEntity)
+	if err != nil {
+		log.Errorf("[GetCustomerAll-2] GetCustomerAll: %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusInternalServerError, resp)
+	}
+	for _, val := range results {
+		respUser = append(respUser, response.ProfileResponse{
+			ID:      val.ID,
+			Name:    val.Name,
+			Email:   val.Email,
+			Address: val.Address,
+			Phone:   val.Phone,
+			Photo:   val.Photo,
+			Lat:     val.Lat,
+			Lng:     val.Lng,
+		})
+	}
+	resp.Message = "success"
+	resp.Data = respUser
+	resp.Pagination = struct {
+		Page       int64 `json:"page"`
+		TotalCount int64 `json:"total_count"`
+		PerPage    int64 `json:"per_page"`
+		TotalPage  int64 `json:"total_page"`
+	}{
+		Page:       page,
+		TotalCount: countData,
+		PerPage:    limit,
+		TotalPage:  totalPage,
+	}
+
+	return c.JSON(http.StatusOK, resp)
 }
 
 // UpdateDataUser implements [UserHandlerInterface].
@@ -402,6 +482,7 @@ func NewUserHandler(e *echo.Echo, userService service.UserServiceInterface, cfg 
 
 	mid := adapter.NewMiddlewareAdapter(cfg, jwtService)
 	adminGroup := e.Group("/admin", mid.CheckToken())
+	adminGroup.GET("/customer", userHandler.GetCustomerAll)
 	adminGroup.GET("/check", func(c echo.Context) error {
 		return c.String(200, "ok")
 	})

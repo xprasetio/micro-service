@@ -24,6 +24,7 @@ type UserServiceInterface interface {
 	UpdatePassword(ctx context.Context, req entity.UserEntity) error
 	GetProfileUser(ctx context.Context, userID int64) (*entity.UserEntity, error)
 	UpdateDataUser(ctx context.Context, req entity.UserEntity) error
+	GetCustomerAll(ctx context.Context, query entity.QueryStringCustomer) ([]entity.UserEntity, int64, int64, error)
 }
 
 type userService struct {
@@ -31,6 +32,11 @@ type userService struct {
 	cfg            *config.Config
 	jwtService     JwtServiceInterface
 	repoToken      repository.VerificationTokenRepositoryInterface
+}
+
+// GetCustomerAll implements [UserServiceInterface].
+func (u *userService) GetCustomerAll(ctx context.Context, query entity.QueryStringCustomer) ([]entity.UserEntity, int64, int64, error) {
+	return u.userRepository.GetCustomerAll(ctx, query)
 }
 
 // UpdateDataUser implements [UserServiceInterface].
