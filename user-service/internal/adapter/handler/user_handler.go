@@ -27,10 +27,54 @@ type UserHandlerInterface interface {
 
 	//modul customer admin
 	GetCustomerAll(ctx echo.Context) error
+	GetCustomerByID(ctx echo.Context) error
 }
 
 type userHandler struct {
 	userService service.UserServiceInterface
+}
+
+func (u *userHandler) GetCustomerByID(c echo.Context) error {
+	var (
+		resp     = response.DefaultResponse{}
+		ctx      = c.Request().Context()
+		respUser = response.CustomerResponse{}
+	)
+	user := c.Get("user").(string)
+	if user == "" {
+		log.Errorf("[GetCustomerByID-1] GetCustomerByID: %s", "user not found")
+		resp.Message = "user not found"
+		resp.Data = nil
+		return c.JSON(http.StatusNotFound, resp)
+	}
+	id := c.Param("id")
+	userID, err := conv.StringToInt64(id)
+	if err != nil {
+		log.Errorf("[GetCustomerByID-2] GetCustomerByID: %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusBadRequest, resp)
+	}
+	dataUser, err := u.userService.GetCustomerByID(ctx, userID)
+	if err != nil {
+		log.Errorf("[GetCustomerByID-3] GetCustomerByID: %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusBadRequest, resp)
+	}
+	resp.Message = "success get customer by id"
+	respUser.Name = dataUser.Name
+	respUser.Email = dataUser.Email
+	respUser.ID = dataUser.ID
+	respUser.Address = dataUser.Address
+	respUser.Phone = dataUser.Phone
+	respUser.Photo = dataUser.Photo
+	respUser.Lat = dataUser.Lat
+	respUser.Lng = dataUser.Lng
+	resp.Data = respUser
+	respUser.RoleID = dataUser.RoleID
+
+	return c.JSON(http.StatusOK, resp)
 }
 
 func (u *userHandler) GetCustomerAll(c echo.Context) error {
@@ -483,6 +527,7 @@ func NewUserHandler(e *echo.Echo, userService service.UserServiceInterface, cfg 
 	mid := adapter.NewMiddlewareAdapter(cfg, jwtService)
 	adminGroup := e.Group("/admin", mid.CheckToken())
 	adminGroup.GET("/customer", userHandler.GetCustomerAll)
+	adminGroup.GET("/customer/:id", userHandler.GetCustomerByID)
 	adminGroup.GET("/check", func(c echo.Context) error {
 		return c.String(200, "ok")
 	})

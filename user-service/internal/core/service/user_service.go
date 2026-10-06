@@ -25,6 +25,7 @@ type UserServiceInterface interface {
 	GetProfileUser(ctx context.Context, userID int64) (*entity.UserEntity, error)
 	UpdateDataUser(ctx context.Context, req entity.UserEntity) error
 	GetCustomerAll(ctx context.Context, query entity.QueryStringCustomer) ([]entity.UserEntity, int64, int64, error)
+	GetCustomerByID(ctx context.Context, userID int64) (*entity.UserEntity, error)
 }
 
 type userService struct {
@@ -32,6 +33,11 @@ type userService struct {
 	cfg            *config.Config
 	jwtService     JwtServiceInterface
 	repoToken      repository.VerificationTokenRepositoryInterface
+}
+
+// GetCustomerByID implements [UserServiceInterface].
+func (u *userService) GetCustomerByID(ctx context.Context, userID int64) (*entity.UserEntity, error) {
+	return u.userRepository.GetCustomerByID(ctx, userID)
 }
 
 // GetCustomerAll implements [UserServiceInterface].

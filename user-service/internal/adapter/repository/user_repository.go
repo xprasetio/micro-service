@@ -23,10 +23,38 @@ type UserRepositoryInterface interface {
 
 	// Modul Customer Admin
 	GetCustomerAll(ctx context.Context, query entity.QueryStringCustomer) ([]entity.UserEntity, int64, int64, error)
+	GetCustomerByID(ctx context.Context, userID int64) (*entity.UserEntity, error)
 }
 
 type userRepository struct {
 	db *gorm.DB
+}
+
+// GetCustomerByID implements [UserRepositoryInterface].
+func (u *userRepository) GetCustomerByID(ctx context.Context, userID int64) (*entity.UserEntity, error) {
+	modelUser := model.User{}
+	if err := u.db.WithContext(ctx).Where("id = ? AND is_verified = TRUE", userID).Preload("Roles", "name = ?", "Customer").First(&modelUser).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			err = errors.New("404")
+			log.Errorf("[UserRepository-1] GetCustomerByID: %v", err)
+			return nil, err
+		}
+		log.Errorf("[UserRepository-1] GetCustomerByID: %v", err)
+		return nil, err
+	}
+	return &entity.UserEntity{
+		ID:         modelUser.ID,
+		Name:       modelUser.Name,
+		Email:      modelUser.Email,
+		RoleName:   modelUser.Roles[0].Name,
+		Lat:        modelUser.Lat,
+		Lng:        modelUser.Lng,
+		Address:    modelUser.Address,
+		Phone:      modelUser.Phone,
+		Photo:      modelUser.Photo,
+		IsVerified: modelUser.IsVerified,
+		RoleID:     modelUser.Roles[0].ID,
+	}, nil
 }
 
 // GetAllUser implements [UserRepositoryInterface].

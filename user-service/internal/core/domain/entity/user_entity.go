@@ -13,6 +13,7 @@ type UserEntity struct {
 	IsVerified bool   `json:"is_verified"`
 	RoleName   string `json:"role_name"`
 	Token      string `json:"token"`
+	RoleID     int64  `json:"role_id"`
 }
 
 type QueryStringCustomer struct {
