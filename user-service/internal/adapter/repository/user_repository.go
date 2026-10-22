@@ -24,10 +24,38 @@ type UserRepositoryInterface interface {
 	// Modul Customer Admin
 	GetCustomerAll(ctx context.Context, query entity.QueryStringCustomer) ([]entity.UserEntity, int64, int64, error)
 	GetCustomerByID(ctx context.Context, userID int64) (*entity.UserEntity, error)
+	CreateCustomer(ctx context.Context, req entity.UserEntity) error
 }
 
 type userRepository struct {
 	db *gorm.DB
+}
+
+// CreateCustomer implements [UserRepositoryInterface].
+func (u *userRepository) CreateCustomer(ctx context.Context, req entity.UserEntity) error {
+	modelRole := model.Role{}
+	err := u.db.WithContext(ctx).Where("id = ?", req.RoleID).First(&modelRole).Error
+	if err != nil {
+		log.Errorf("[UserRepository-1] CreateCustomer: %v", err)
+		return err
+	}
+
+	modelUser := model.User{
+		Name:     req.Name,
+		Email:    req.Email,
+		Password: req.Password,
+		Address:  req.Address,
+		Phone:    req.Phone,
+		Photo:    req.Photo,
+		Lat:      req.Lat,
+		Lng:      req.Lng,
+		Roles:    []model.Role{modelRole},
+	}
+	if err := u.db.WithContext(ctx).Create(&modelUser).Error; err != nil {
+		log.Errorf("[UserRepository-1] CreateCustomer: %v", err)
+		return err
+	}
+	return nil
 }
 
 // GetCustomerByID implements [UserRepositoryInterface].
