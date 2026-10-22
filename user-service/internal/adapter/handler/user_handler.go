@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"user-service/config"
 	"user-service/internal/adapter"
 	"user-service/internal/adapter/handler/request"
@@ -28,10 +29,150 @@ type UserHandlerInterface interface {
 	//modul customer admin
 	GetCustomerAll(ctx echo.Context) error
 	GetCustomerByID(ctx echo.Context) error
+	UpdateCustomer(ctx echo.Context) error
+	CreateCustomer(ctx echo.Context) error
+	DeleteCustomer(ctx echo.Context) error
 }
 
 type userHandler struct {
 	userService service.UserServiceInterface
+}
+
+func (u *userHandler) DeleteCustomer(c echo.Context) error {
+	var (
+		resp = response.DefaultResponse{}
+		ctx  = c.Request().Context()
+	)
+	user := c.Get("user").(string)
+	if user == "" {
+		log.Errorf("[DeleteCustomer-1] DeleteCustomer: %s", "user not found")
+		resp.Message = "user not found"
+		resp.Data = nil
+		return c.JSON(http.StatusUnauthorized, resp)
+	}
+	id := c.Param("id")
+	customerID, err := conv.StringToInt64(id)
+	if err != nil {
+		log.Errorf("[DeleteCustomer-2] DeleteCustomer: %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusBadRequest, resp)
+	}
+	err = u.userService.DeleteCustomer(ctx, customerID)
+	if err != nil {
+		log.Errorf("[UserHandler-1] DeleteCustomer: %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusInternalServerError, resp)
+	}
+	resp.Message = "success"
+	resp.Data = nil
+	return c.JSON(http.StatusOK, resp)
+}
+
+func (u *userHandler) CreateCustomer(c echo.Context) error {
+	var (
+		req  = request.CustomerRequest{}
+		resp = response.DefaultResponse{}
+		ctx  = c.Request().Context()
+	)
+	user := c.Get("user").(string)
+	if user == "" {
+		log.Errorf("[CreateCustomer-1] CreateCustomer: %s", "user not found")
+		resp.Message = "user not found"
+		resp.Data = nil
+		return c.JSON(http.StatusUnauthorized, resp)
+	}
+	if err := c.Bind(&req); err != nil {
+		log.Errorf("[CreateCustomer-2] CreateCustomer: %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusUnprocessableEntity, resp)
+	}
+
+	if err = c.Validate(req); err != nil {
+		log.Errorf("[CreateCustomer-3] CreateCustomer: %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusUnprocessableEntity, resp)
+	}
+	reqEntity := entity.UserEntity{
+		Name:     req.Name,
+		Email:    req.Email,
+		Password: req.Password,
+		Phone:    req.Phone,
+		Address:  req.Address,
+		Lat:      strconv.FormatFloat(req.Lat, 'g', -1, 64),
+		Lng:      strconv.FormatFloat(req.Lng, 'g', -1, 64),
+		RoleID:   req.RoleID,
+	}
+	err := u.userService.CreateCustomer(ctx, reqEntity)
+	if err != nil {
+		log.Errorf("[UserHandler-1] CreateCustomer: %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusInternalServerError, resp)
+	}
+	resp.Message = "success"
+	resp.Data = nil
+	return c.JSON(http.StatusOK, resp)
+}
+
+func (u *userHandler) UpdateCustomer(c echo.Context) error {
+	var (
+		req  = request.CustomerRequest{}
+		resp = response.DefaultResponse{}
+		ctx  = c.Request().Context()
+	)
+	user := c.Get("user").(string)
+	if user == "" {
+		log.Errorf("[UpdateCustomer-1] UpdateCustomer: %s", "user not found")
+		resp.Message = "user not found"
+		resp.Data = nil
+		return c.JSON(http.StatusUnauthorized, resp)
+	}
+	if err := c.Bind(&req); err != nil {
+		log.Errorf("[UpdateCustomer-2] UpdateCustomer: %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusUnprocessableEntity, resp)
+	}
+
+	if err = c.Validate(req); err != nil {
+		log.Errorf("[UpdateCustomer-3] UpdateCustomer: %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusUnprocessableEntity, resp)
+	}
+	id := c.Param("id")
+	userID, err := conv.StringToInt64(id)
+	if err != nil {
+		log.Errorf("[UpdateCustomer-4] UpdateCustomer: %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusBadRequest, resp)
+	}
+	reqEntity := entity.UserEntity{
+		ID:       userID,
+		Name:     req.Name,
+		Email:    req.Email,
+		Password: req.Password,
+		Phone:    req.Phone,
+		Address:  req.Address,
+		Lat:      strconv.FormatFloat(req.Lat, 'g', -1, 64),
+		Lng:      strconv.FormatFloat(req.Lng, 'g', -1, 64),
+		RoleID:   req.RoleID,
+	}
+	err = u.userService.UpdateCustomer(ctx, reqEntity)
+	if err != nil {
+		log.Errorf("[UserHandler-1] UpdateCustomer: %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusInternalServerError, resp)
+	}
+	resp.Message = "success"
+	resp.Data = nil
+	return c.JSON(http.StatusOK, resp)
 }
 
 func (u *userHandler) GetCustomerByID(c echo.Context) error {
@@ -527,7 +668,10 @@ func NewUserHandler(e *echo.Echo, userService service.UserServiceInterface, cfg 
 	mid := adapter.NewMiddlewareAdapter(cfg, jwtService)
 	adminGroup := e.Group("/admin", mid.CheckToken())
 	adminGroup.GET("/customer", userHandler.GetCustomerAll)
+	adminGroup.POST("/customer", userHandler.CreateCustomer)
+	adminGroup.PUT("/customer/:id", userHandler.UpdateCustomer)
 	adminGroup.GET("/customer/:id", userHandler.GetCustomerByID)
+	adminGroup.DELETE("/customer/:id", userHandler.DeleteCustomer)
 	adminGroup.GET("/check", func(c echo.Context) error {
 		return c.String(200, "ok")
 	})
